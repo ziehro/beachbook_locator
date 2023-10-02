@@ -27,7 +27,7 @@ if (flutterVersionName == null) {
 android {
 
     defaultConfig {
-        minSdkVersion 29
+        minSdkVersion 26
     }
     namespace "com.ziehro.beachbook_locator"
     compileSdkVersion flutter.compileSdkVersion

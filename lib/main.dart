@@ -44,48 +44,67 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 
   Future<void> _getLocation() async {
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled!) {
-      _serviceEnabled = await location.requestService();
+    try {
+      _serviceEnabled = await location.serviceEnabled();
       if (!_serviceEnabled!) {
-        return;
+        _serviceEnabled = await location.requestService();
+        if (!_serviceEnabled!) {
+          // Inform the user about the importance of enabling location services.
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Location services are required!')));
+          return;
+        }
       }
-    }
 
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        return;
+      _permissionGranted = await location.hasPermission();
+      if (_permissionGranted == PermissionStatus.denied) {
+        _permissionGranted = await location.requestPermission();
+        if (_permissionGranted != PermissionStatus.granted) {
+          // Inform the user about the importance of granting location permissions.
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Location permissions are required!')));
+          return;
+        }
       }
-    }
 
-    _locationData = await location.getLocation();
+      _locationData = await location.getLocation();
+      print("Fetched Location: ${_locationData?.latitude}, ${_locationData?.longitude}");
+    } catch (e) {
+      // Handle any potential errors
+      print("An error occurred: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('An error occurred while fetching location!')));
+    }
   }
 
-  Stream<List<DocumentSnapshot>> getNearbyBeaches() {
-    return FirebaseFirestore.instance
+
+  Stream<List<DocumentSnapshot>> getNearbyBeaches() async* {
+    await _getLocation(); // Make sure to fetch location before processing beaches.
+    yield* FirebaseFirestore.instance
         .collection('locations')
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs..sort((a, b) {
-        double distanceA = calculateDistance(
-          _locationData?.latitude ?? 0.0,
-          _locationData?.longitude ?? 0.0,
-          (a.data() as Map<String, dynamic>)['latitude'].toDouble(),
-          (a.data() as Map<String, dynamic>)['longitude'].toDouble(),
-        );
-        double distanceB = calculateDistance(
-          _locationData?.latitude ?? 0.0,
-          _locationData?.longitude ?? 0.0,
-          (b.data() as Map<String, dynamic>)['latitude'].toDouble(),
-          (b.data() as Map<String, dynamic>)['longitude'].toDouble(),
-        );
-        return distanceA.compareTo(distanceB);
-
-      });
+      List<DocumentSnapshot> sortedDocs = snapshot.docs.toList()
+        ..sort((a, b) {
+          double distanceA = calculateDistance(
+            _locationData?.latitude ?? 0.0,
+            _locationData?.longitude ?? 0.0,
+            (a.data() as Map<String, dynamic>)['latitude'].toDouble(),
+            (a.data() as Map<String, dynamic>)['longitude'].toDouble(),
+          );
+          double distanceB = calculateDistance(
+            _locationData?.latitude ?? 0.0,
+            _locationData?.longitude ?? 0.0,
+            (b.data() as Map<String, dynamic>)['latitude'].toDouble(),
+            (b.data() as Map<String, dynamic>)['longitude'].toDouble(),
+          );
+          return distanceA.compareTo(distanceB);
+        });
+      return sortedDocs.take(10).toList(); // Only take the top 3 nearest beaches.
     });
   }
+
+
 
 
 
