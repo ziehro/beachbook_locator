@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';  // Add this import for kIsWeb
 import 'package:url_launcher/url_launcher.dart';
 import 'src/url_launcher/url_launcher_stub.dart'
 if (dart.library.js) 'src/url_launcher/url_launcher_web.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:html' as html;
 
 
 
@@ -40,8 +42,7 @@ class BeachListScreen extends StatefulWidget {
 }
 
 class _BeachListScreenState extends State<BeachListScreen> {
-  final Location location = Location();
-  LocationData? _locationData;
+  Position? _currentPosition;
   final StreamController<List<DocumentSnapshot>> _streamController = StreamController<List<DocumentSnapshot>>();
 
   @override
@@ -70,23 +71,16 @@ class _BeachListScreenState extends State<BeachListScreen> {
 
   Future<void> _getLocation() async {
     try {
-      bool serviceEnabled = await location.serviceEnabled();
-      if (!serviceEnabled) {
-        serviceEnabled = await location.requestService();
-        if (!serviceEnabled) {
-          return; // Handle this case as needed.
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          return; // Location permissions are denied
         }
       }
 
-      PermissionStatus permissionGranted = await location.hasPermission();
-      if (permissionGranted == PermissionStatus.denied) {
-        permissionGranted = await location.requestPermission();
-        if (permissionGranted != PermissionStatus.granted) {
-          return; // Handle this case as needed.
-        }
-      }
-
-      _locationData = await location.getLocation();
+      _currentPosition = await Geolocator.getCurrentPosition();
       setState(() {}); // Trigger a UI refresh now that we have location.
     } catch (e) {
       print("Error fetching location: $e");
@@ -110,12 +104,13 @@ class _BeachListScreenState extends State<BeachListScreen> {
   double _calculateDistanceFromUser(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return _calculateDistance(
-      _locationData?.latitude ?? 0,
-      _locationData?.longitude ?? 0,
+      _currentPosition?.latitude ?? 0,
+      _currentPosition?.longitude ?? 0,
       data['latitude'],
       data['longitude'],
     );
   }
+
 
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     var p = 0.017453292519943295; // Pi/180
@@ -123,6 +118,9 @@ class _BeachListScreenState extends State<BeachListScreen> {
         cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
   }
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
