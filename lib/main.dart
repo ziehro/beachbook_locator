@@ -1,17 +1,18 @@
+
+
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:location/location.dart';
 import 'dart:math';
 import 'dart:async';
 import 'firebase_options.dart';
 import 'package:flutter/foundation.dart';  // Add this import for kIsWeb
 import 'package:url_launcher/url_launcher.dart';
-import 'src/url_launcher/url_launcher_stub.dart'
-if (dart.library.js) 'src/url_launcher/url_launcher_web.dart';
 import 'package:geolocator/geolocator.dart';
-import 'dart:html' as html;
+import 'package:flutter_midi/flutter_midi.dart';
+
+
 
 
 
@@ -44,6 +45,8 @@ class BeachListScreen extends StatefulWidget {
 class _BeachListScreenState extends State<BeachListScreen> {
   Position? _currentPosition;
   final StreamController<List<DocumentSnapshot>> _streamController = StreamController<List<DocumentSnapshot>>();
+  final FlutterMidi flutterMidi = FlutterMidi();
+
 
   @override
   void initState() {
@@ -57,13 +60,19 @@ class _BeachListScreenState extends State<BeachListScreen> {
     String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$latitude,$longitude";
 
     if (kIsWeb) {
-      launchMapsUrl; // This will open a new browser tab
+      launchWebURL(googleMapsUrl);
     } else {
       if (await canLaunch(googleMapsUrl)) {
         await launch(googleMapsUrl);
       } else {
         throw 'Could not launch Google Maps';
       }
+    }
+  }
+
+  void launchWebURL(String url) {
+    if (kIsWeb) {
+      launch(url);
     }
   }
 
@@ -216,6 +225,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
+
                           IconButton(
                             icon: Icon(Icons.info_outline),
                             onPressed: () {
@@ -232,6 +242,14 @@ class _BeachListScreenState extends State<BeachListScreen> {
                             },
                           ),
                         ],
+
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          List<String> notes = paramsToNotes(data);
+                          _playSong(notes);
+                        },
+                        child: Text("Play Song"),
                       ),
                     ],
                   ),
@@ -249,6 +267,45 @@ class _BeachListScreenState extends State<BeachListScreen> {
     _streamController.close();
     super.dispose();
   }
+
+  List<String> paramsToNotes(Map<String, dynamic> params) {
+    const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+    List<String> generatedNotes = [];
+
+    params.forEach((key, value) {
+      if (value is int) {
+        generatedNotes.add(notes[value % notes.length]);
+      } else if (value is String && value.isNotEmpty) {
+        int noteIndex = value.codeUnitAt(0) % notes.length;
+        generatedNotes.add(notes[noteIndex]);
+      }
+    });
+
+    return generatedNotes;
+  }
+
+  void _playSong(List<String> notes) {
+    for (String note in notes) {
+      flutterMidi.playMidiNote(midi: midiNoteValueFor(note));
+    }
+  }
+
+  int midiNoteValueFor(String note) {
+    // Convert note names to MIDI note values. This is a basic example.
+    switch (note) {
+      case 'C':
+        return 60; // MIDI value for Middle C
+      case 'D':
+        return 62;
+      case 'E':
+        return 64;
+    // ... add cases for other notes
+      default:
+        return 60;
+    }
+  }
+
 
   void _showBeachDialog(Map<String, dynamic> data) {
     showDialog(
