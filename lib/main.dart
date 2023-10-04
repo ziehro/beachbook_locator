@@ -10,7 +10,9 @@ import 'firebase_options.dart';
 import 'package:flutter/foundation.dart';  // Add this import for kIsWeb
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_beep/flutter_beep.dart';
+import 'package:flutter_midi/flutter_midi.dart';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 
 
@@ -25,6 +27,7 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -33,9 +36,6 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: BeachListScreen(),
-      routes: {
-        '/music': (context) => MusicFromData(),
-      },
     );
   }
 }
@@ -59,6 +59,15 @@ class _BeachListScreenState extends State<BeachListScreen> {
     493.88, // B
   ];
 
+  void _navigateToMusic() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MusicFromData(currentPosition: _currentPosition),
+      ),
+    );
+  }
+
+
   List<double> generateSong(Map<String, dynamic> data) {
     List<double> song = [];
     data.forEach((key, value) {
@@ -70,26 +79,12 @@ class _BeachListScreenState extends State<BeachListScreen> {
     return song;
   }
 
-  void playSong() async {
-    Map<String, dynamic> data = {
-      'Anemones': 1,
-      'Barnacles': 3,
-      'Baseball Rocks': 2,
-      // ... add all other data
-      'Windy': 1,
-    };
-    List<double> songFrequencies = generateSong(data);
-    for (double frequency in songFrequencies) {
-      await FlutterBeep.beep(); // This will make a beep sound
-      await Future.delayed(Duration(milliseconds: 100)); // Wait for 100ms between notes
-    }
-  }
 
   @override
   void initState() {
     super.initState();
     _getLocation().then((_) {
-      _streamController.addStream(getNearbyBeaches());
+      _streamController.addStream(getNearbyBeaches(_currentPosition));
     });
   }
 
@@ -133,37 +128,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
     }
   }
 
-  Stream<List<DocumentSnapshot>> getNearbyBeaches() {
-    return FirebaseFirestore.instance.collection('locations').snapshots().map((snapshot) {
-      var sortedDocs = snapshot.docs.toList()
-        ..sort((a, b) => _compareDistance(a, b));
-      return sortedDocs.take(5).toList();
-    });
-  }
 
-  int _compareDistance(DocumentSnapshot a, DocumentSnapshot b) {
-    double distanceA = _calculateDistanceFromUser(a);
-    double distanceB = _calculateDistanceFromUser(b);
-    return distanceA.compareTo(distanceB);
-  }
-
-  double _calculateDistanceFromUser(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return _calculateDistance(
-      _currentPosition?.latitude ?? 0,
-      _currentPosition?.longitude ?? 0,
-      data['latitude'],
-      data['longitude'],
-    );
-  }
-
-
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    var p = 0.017453292519943295; // Pi/180
-    var a = 0.5 - cos((lat2 - lat1) * p) / 2 +
-        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
-    return 12742 * asin(sqrt(a));
-  }
 
 
 
@@ -243,8 +208,15 @@ class _BeachListScreenState extends State<BeachListScreen> {
                     children: [
                       ElevatedButton(
                         child: Text('Play Song'),
-                        onPressed: playSong,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => MusicFromData(currentPosition: _currentPosition),
+                            ),
+                          );
+                        },
                       ),
+
                       Container(
                         width: kIsWeb ? 200 : 100,
                         height: kIsWeb ? 200 : 100,
@@ -358,62 +330,122 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 }
 class MusicFromData extends StatefulWidget {
+  final Position? currentPosition;
+  MusicFromData({required this.currentPosition});
+
   @override
   _MusicFromDataState createState() => _MusicFromDataState();
 }
 
 class _MusicFromDataState extends State<MusicFromData> {
-  final List<double> frequencies = [
-    261.63, // C
-    293.66, // D
-    329.63, // E
-    349.23, // F
-    392.00, // G
-    440.00, // A
-    493.88, // B
+
+  final flutterMidi = FlutterMidi();
+
+  final List<int> midiNotes = [
+    60, // C4
+    62, // D4
+    64, // E4
+    65, // F4
+    67, // G4
+    69, // A4
+    71, // B4
   ];
 
-  List<double> generateSong(Map<String, dynamic> data) {
-    List<double> song = [];
+  List<int> generateSong(Map<String, dynamic> data) {
+    List<int> song = [];
     data.forEach((key, value) {
       if (value is int) {
-        int noteIndex = value % frequencies.length;
-        song.add(frequencies[noteIndex]);
+        int noteIndex = value % midiNotes.length;
+        song.add(midiNotes[noteIndex]);
+      } else if (value is double) {
+        int intValue = value.toInt();
+        int noteIndex = intValue % midiNotes.length;
+        song.add(midiNotes[noteIndex]);
       }
     });
     return song;
   }
 
   @override
+  void initState() {
+    super.initState();
+    loadMidi();
+  }
+
+  void loadMidi() async {
+    ByteData byteData = await rootBundle.load('assets/sounds/Piano.SF2');
+    await flutterMidi.prepare(sf2: byteData);
+  }
+
+
+  @override
   Widget build(BuildContext context) {
-    Map<String, dynamic> data = {
-      'Anemones': 1,
-      'Barnacles': 3,
-      'Baseball Rocks': 2,
-      // ... add all other data
-      'Windy': 1,
-    };
-
-    List<double> songFrequencies = generateSong(data);
-
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Center(
-          child: ElevatedButton(
-            child: Text('Play Song'),
-            onPressed: () async {
+      body: StreamBuilder<List<DocumentSnapshot>>(
+        stream: getNearbyBeaches(widget.currentPosition),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
 
-               for (double frequency in songFrequencies) {
-                 await FlutterBeep.beep(); // This will make a beep sound
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('Error loading beach data.'));
+          }
 
-                 await Future.delayed(Duration(
-                     milliseconds: 100)); // Wait for 100ms between notes
-               }
-              // ... your code
-            },
-          ),
-        ),
+          return ListView.builder(
+              itemCount: snapshot.data!.length,
+              itemBuilder: (context, index) {
+                var beach = snapshot.data![index];
+                var data = beach.data() as Map<String, dynamic>;
+                List<int> songMidiNotes = generateSong(data);
+
+                return ListTile(
+                  title: Text(data['name'] ?? 'Unknown Beach'),
+                  trailing: ElevatedButton(
+                    child: Text('Play Song'),
+                    onPressed: () async {
+                      for (int midiNote in songMidiNotes) {
+                        flutterMidi.playMidiNote(midi: midiNote);
+
+                        await Future.delayed(Duration(milliseconds: 300)); // Wait for 100ms between notes
+                      }
+                    },
+                  ),
+                );
+              }
+          );
+        },
       ),
     );
   }
+}
+Stream<List<DocumentSnapshot>> getNearbyBeaches(Position? currentPosition) {
+  return FirebaseFirestore.instance.collection('locations').snapshots().map((snapshot) {
+    var sortedDocs = snapshot.docs.toList()
+      ..sort((a, b) => _compareDistance(a, b, currentPosition));
+    return sortedDocs.take(3).toList();
+  });
+}
+
+int _compareDistance(DocumentSnapshot a, DocumentSnapshot b, Position? currentPosition) {
+  double distanceA = _calculateDistanceFromUser(a, currentPosition);
+  double distanceB = _calculateDistanceFromUser(b, currentPosition);
+  return distanceA.compareTo(distanceB);
+}
+double _calculateDistanceFromUser(DocumentSnapshot doc, Position? currentPosition) {
+  Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+  return _calculateDistance(
+    currentPosition?.latitude ?? 0,
+    currentPosition?.longitude ?? 0,
+    data['latitude'],
+    data['longitude'],
+  );
+}
+
+
+double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  var p = 0.017453292519943295; // Pi/180
+  var a = 0.5 - cos((lat2 - lat1) * p) / 2 +
+      cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+  return 12742 * asin(sqrt(a));
 }

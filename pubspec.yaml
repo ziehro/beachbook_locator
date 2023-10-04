@@ -40,7 +40,7 @@ dependencies:
   url_launcher: 6.1.14
   geolocator: 10.1.0
   audioplayers: 5.2.0
-  flutter_beep: 1.0.0
+  flutter_midi: 1.1.0
 
 
 
@@ -64,7 +64,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
+  assets:
+  - assets/sounds/Piano.SF2
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
