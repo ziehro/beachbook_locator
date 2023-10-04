@@ -206,16 +206,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
                   child: Column(
 
                     children: [
-                      ElevatedButton(
-                        child: Text('Play Song'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => MusicFromData(currentPosition: _currentPosition),
-                            ),
-                          );
-                        },
-                      ),
+
 
                       Container(
                         width: kIsWeb ? 200 : 100,
@@ -254,6 +245,16 @@ class _BeachListScreenState extends State<BeachListScreen> {
                               _launchMapsUrl(
                                 data['latitude'],
                                 data['longitude'],
+                              );
+                            },
+                          ),
+                          ElevatedButton(
+                            child: Text('Play Song'),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => MusicFromData(currentPosition: _currentPosition),
+                                ),
                               );
                             },
                           ),
