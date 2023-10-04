@@ -10,7 +10,7 @@ import 'firebase_options.dart';
 import 'package:flutter/foundation.dart';  // Add this import for kIsWeb
 import 'package:url_launcher/url_launcher.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_midi/flutter_midi.dart';
+import 'package:flutter_beep/flutter_beep.dart';
 
 
 
@@ -33,6 +33,9 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: BeachListScreen(),
+      routes: {
+        '/music': (context) => MusicFromData(),
+      },
     );
   }
 }
@@ -45,8 +48,42 @@ class BeachListScreen extends StatefulWidget {
 class _BeachListScreenState extends State<BeachListScreen> {
   Position? _currentPosition;
   final StreamController<List<DocumentSnapshot>> _streamController = StreamController<List<DocumentSnapshot>>();
-  final FlutterMidi flutterMidi = FlutterMidi();
 
+  final List<double> frequencies = [
+    261.63, // C
+    293.66, // D
+    329.63, // E
+    349.23, // F
+    392.00, // G
+    440.00, // A
+    493.88, // B
+  ];
+
+  List<double> generateSong(Map<String, dynamic> data) {
+    List<double> song = [];
+    data.forEach((key, value) {
+      if (value is int) {
+        int noteIndex = value % frequencies.length;
+        song.add(frequencies[noteIndex]);
+      }
+    });
+    return song;
+  }
+
+  void playSong() async {
+    Map<String, dynamic> data = {
+      'Anemones': 1,
+      'Barnacles': 3,
+      'Baseball Rocks': 2,
+      // ... add all other data
+      'Windy': 1,
+    };
+    List<double> songFrequencies = generateSong(data);
+    for (double frequency in songFrequencies) {
+      await FlutterBeep.beep(); // This will make a beep sound
+      await Future.delayed(Duration(milliseconds: 100)); // Wait for 100ms between notes
+    }
+  }
 
   @override
   void initState() {
@@ -202,7 +239,12 @@ class _BeachListScreenState extends State<BeachListScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                   child: Column(
+
                     children: [
+                      ElevatedButton(
+                        child: Text('Play Song'),
+                        onPressed: playSong,
+                      ),
                       Container(
                         width: kIsWeb ? 200 : 100,
                         height: kIsWeb ? 200 : 100,
@@ -226,6 +268,8 @@ class _BeachListScreenState extends State<BeachListScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
 
+
+
                           IconButton(
                             icon: Icon(Icons.info_outline),
                             onPressed: () {
@@ -244,13 +288,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
                         ],
 
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          List<String> notes = paramsToNotes(data);
-                          _playSong(notes);
-                        },
-                        child: Text("Play Song"),
-                      ),
+
                     ],
                   ),
                 ),
@@ -268,43 +306,6 @@ class _BeachListScreenState extends State<BeachListScreen> {
     super.dispose();
   }
 
-  List<String> paramsToNotes(Map<String, dynamic> params) {
-    const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-
-    List<String> generatedNotes = [];
-
-    params.forEach((key, value) {
-      if (value is int) {
-        generatedNotes.add(notes[value % notes.length]);
-      } else if (value is String && value.isNotEmpty) {
-        int noteIndex = value.codeUnitAt(0) % notes.length;
-        generatedNotes.add(notes[noteIndex]);
-      }
-    });
-
-    return generatedNotes;
-  }
-
-  void _playSong(List<String> notes) {
-    for (String note in notes) {
-      flutterMidi.playMidiNote(midi: midiNoteValueFor(note));
-    }
-  }
-
-  int midiNoteValueFor(String note) {
-    // Convert note names to MIDI note values. This is a basic example.
-    switch (note) {
-      case 'C':
-        return 60; // MIDI value for Middle C
-      case 'D':
-        return 62;
-      case 'E':
-        return 64;
-    // ... add cases for other notes
-      default:
-        return 60;
-    }
-  }
 
 
   void _showBeachDialog(Map<String, dynamic> data) {
@@ -355,8 +356,64 @@ class _BeachListScreenState extends State<BeachListScreen> {
       },
     );
   }
-
-
-
+}
+class MusicFromData extends StatefulWidget {
+  @override
+  _MusicFromDataState createState() => _MusicFromDataState();
 }
 
+class _MusicFromDataState extends State<MusicFromData> {
+  final List<double> frequencies = [
+    261.63, // C
+    293.66, // D
+    329.63, // E
+    349.23, // F
+    392.00, // G
+    440.00, // A
+    493.88, // B
+  ];
+
+  List<double> generateSong(Map<String, dynamic> data) {
+    List<double> song = [];
+    data.forEach((key, value) {
+      if (value is int) {
+        int noteIndex = value % frequencies.length;
+        song.add(frequencies[noteIndex]);
+      }
+    });
+    return song;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Map<String, dynamic> data = {
+      'Anemones': 1,
+      'Barnacles': 3,
+      'Baseball Rocks': 2,
+      // ... add all other data
+      'Windy': 1,
+    };
+
+    List<double> songFrequencies = generateSong(data);
+
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Center(
+          child: ElevatedButton(
+            child: Text('Play Song'),
+            onPressed: () async {
+
+               for (double frequency in songFrequencies) {
+                 await FlutterBeep.beep(); // This will make a beep sound
+
+                 await Future.delayed(Duration(
+                     milliseconds: 100)); // Wait for 100ms between notes
+               }
+              // ... your code
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
