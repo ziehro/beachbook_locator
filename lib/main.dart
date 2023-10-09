@@ -352,20 +352,46 @@ class _MusicFromDataState extends State<MusicFromData> {
     71, // B4
   ];
 
-  List<int> generateSong(Map<String, dynamic> data) {
-    List<int> song = [];
+  List<Note> generateSong(Map<String, dynamic> data) {
+    List<Note> song = [];
     data.forEach((key, value) {
       if (value is int) {
         int noteIndex = value % midiNotes.length;
-        song.add(midiNotes[noteIndex]);
+        song.add(Note(midiNotes[noteIndex], Duration(milliseconds: 300)));
       } else if (value is double) {
         int intValue = value.toInt();
         int noteIndex = intValue % midiNotes.length;
-        song.add(midiNotes[noteIndex]);
+        song.add(Note(midiNotes[noteIndex], Duration(milliseconds: 300)));
+      } else if (value is String) {
+        // Use the length of the string to influence rhythm
+        int rhythmValue = value.length % 4;  // This will give values between 0 and 3
+        switch (rhythmValue) {
+          case 0:
+          // Add a fast note sequence (e.g., four eighth notes)
+            for (int i = 0; i < 4; i++) {
+              song.add(Note(midiNotes[(i + rhythmValue) % midiNotes.length], Duration(milliseconds: 150)));
+            }
+            break;
+          case 1:
+          // Add a medium note sequence (e.g., two quarter notes)
+            for (int i = 0; i < 2; i++) {
+              song.add(Note(midiNotes[(i + rhythmValue) % midiNotes.length], Duration(milliseconds: 300)));
+            }
+            break;
+          case 2:
+          // Add a slow note (e.g., one half note)
+            song.add(Note(midiNotes[rhythmValue], Duration(milliseconds: 600)));
+            break;
+          case 3:
+          // Add a very slow note (e.g., one whole note)
+            song.add(Note(midiNotes[rhythmValue], Duration(milliseconds: 1200)));
+            break;
+        }
       }
     });
     return song;
   }
+
 
   @override
   void initState() {
@@ -390,7 +416,7 @@ class _MusicFromDataState extends State<MusicFromData> {
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('Error loading beach data.'));
+            return Center(child: Text('No beaches found.'));
           }
 
           return ListView.builder(
@@ -398,17 +424,16 @@ class _MusicFromDataState extends State<MusicFromData> {
               itemBuilder: (context, index) {
                 var beach = snapshot.data![index];
                 var data = beach.data() as Map<String, dynamic>;
-                List<int> songMidiNotes = generateSong(data);
+                List<Note> songNotes = generateSong(data);
 
                 return ListTile(
                   title: Text(data['name'] ?? 'Unknown Beach'),
                   trailing: ElevatedButton(
                     child: Text('Play Song'),
                     onPressed: () async {
-                      for (int midiNote in songMidiNotes) {
-                        flutterMidi.playMidiNote(midi: midiNote);
-
-                        await Future.delayed(Duration(milliseconds: 300)); // Wait for 100ms between notes
+                      for (var note in songNotes) {
+                        flutterMidi.playMidiNote(midi: note.midiValue);
+                        await Future.delayed(note.duration); // Wait based on the duration of the note
                       }
                     },
                   ),
@@ -419,6 +444,7 @@ class _MusicFromDataState extends State<MusicFromData> {
       ),
     );
   }
+
 }
 Stream<List<DocumentSnapshot>> getNearbyBeaches(Position? currentPosition) {
   return FirebaseFirestore.instance.collection('locations').snapshots().map((snapshot) {
@@ -449,4 +475,11 @@ double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
   var a = 0.5 - cos((lat2 - lat1) * p) / 2 +
       cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
   return 12742 * asin(sqrt(a));
+}
+
+
+class Note {
+  final int midiValue;
+  final Duration duration;
+  Note(this.midiValue, this.duration);
 }
