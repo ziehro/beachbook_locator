@@ -47,8 +47,9 @@ class BeachListScreen extends StatefulWidget {
 
 class _BeachListScreenState extends State<BeachListScreen> {
   Position? _currentPosition;
-  final StreamController<List<DocumentSnapshot>> _streamController = StreamController<List<DocumentSnapshot>>();
-
+  final StreamController<
+      List<DocumentSnapshot>> _streamController = StreamController<
+      List<DocumentSnapshot>>();
 
 
   @override
@@ -86,7 +87,6 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 
 
-
   Future<void> _getLocation() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -106,13 +106,9 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 
 
-
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      //appBar: AppBar(title: Text("Nearby Beaches")),
       body: StreamBuilder<List<DocumentSnapshot>>(
         stream: _streamController.stream,
         builder: (context, snapshot) {
@@ -135,61 +131,81 @@ class _BeachListScreenState extends State<BeachListScreen> {
                 onTap: () {
                   _showBeachDialog(data);
                 },
-
-
                 child: Container(
-                  height: (MediaQuery.of(context).size.height ) / 3,
-
-
+                  height: (MediaQuery
+                      .of(context)
+                      .size
+                      .height - 50) / 3,
                   decoration: BoxDecoration(
                     image: DecorationImage(
                       fit: BoxFit.cover,
                       image: NetworkImage(
-                        data['imageUrls'] != null && data['imageUrls'].isNotEmpty
+                        data['imageUrls'] != null &&
+                            data['imageUrls'].isNotEmpty
                             ? data['imageUrls'][0]
                             : 'placeholder_image_url',
                       ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Stack(
                     children: [
-                      Text(
-                        data['name'],
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                        textAlign: TextAlign.center,  // To ensure the title is in its entirety
+                      // Title (beach name) centered
+                      Center(
+                        child: Text(
+                          data['name'],
+                          style: TextStyle(fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.info_outline, color: Colors.white),
-                            onPressed: () {
-                              _showBeachDialog(data);
-                            },
+                      // Row of buttons positioned 10dp above the bottom
+                      Positioned(
+                        bottom: 10,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8.0),
                           ),
-
-                          IconButton(
-                            icon: Icon(Icons.directions, color: Colors.white),
-                            onPressed: () {
-                              _launchMapsUrl(
-                                data['latitude'],
-                                data['longitude'],
-                              );
-                            },
+                          padding: EdgeInsets.symmetric(
+                              vertical: 5, horizontal: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                    Icons.info_outline, color: Colors.white),
+                                onPressed: () {
+                                  _showBeachDialog(data);
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                    Icons.directions, color: Colors.white),
+                                onPressed: () {
+                                  _launchMapsUrl(
+                                    data['latitude'],
+                                    data['longitude'],
+                                  );
+                                },
+                              ),
+                              ElevatedButton(
+                                child: Text('Play Song'),
+                                onPressed: () async {
+                                  List<Note> songNotes = generateSong(data);
+                                  for (var note in songNotes) {
+                                    flutterMidi.playMidiNote(
+                                        midi: note.midiValue);
+                                    await Future.delayed(note
+                                        .duration); // Wait based on the duration of the note
+                                  }
+                                },
+                              ),
+                            ],
                           ),
-                          ElevatedButton(
-                            child: Text('Play Song'),
-                            onPressed: () async {
-                              List<Note> songNotes = generateSong(data);
-                              for (var note in songNotes) {
-                                flutterMidi.playMidiNote(midi: note.midiValue);
-                                await Future.delayed(note.duration); // Wait based on the duration of the note
-                              }
-                            },
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -233,18 +249,21 @@ class _BeachListScreenState extends State<BeachListScreen> {
         song.add(Note(midiNotes[noteIndex], Duration(milliseconds: 300)));
       } else if (value is String) {
         // Use the length of the string to influence rhythm
-        int rhythmValue = value.length % 4;  // This will give values between 0 and 3
+        int rhythmValue = value.length %
+            4; // This will give values between 0 and 3
         switch (rhythmValue) {
           case 0:
           // Add a fast note sequence (e.g., four eighth notes)
             for (int i = 0; i < 4; i++) {
-              song.add(Note(midiNotes[(i + rhythmValue) % midiNotes.length], Duration(milliseconds: 150)));
+              song.add(Note(midiNotes[(i + rhythmValue) % midiNotes.length],
+                  Duration(milliseconds: 150)));
             }
             break;
           case 1:
           // Add a medium note sequence (e.g., two quarter notes)
             for (int i = 0; i < 2; i++) {
-              song.add(Note(midiNotes[(i + rhythmValue) % midiNotes.length], Duration(milliseconds: 300)));
+              song.add(Note(midiNotes[(i + rhythmValue) % midiNotes.length],
+                  Duration(milliseconds: 300)));
             }
             break;
           case 2:
@@ -253,7 +272,8 @@ class _BeachListScreenState extends State<BeachListScreen> {
             break;
           case 3:
           // Add a very slow note (e.g., one whole note)
-            song.add(Note(midiNotes[rhythmValue], Duration(milliseconds: 1200)));
+            song.add(
+                Note(midiNotes[rhythmValue], Duration(milliseconds: 1200)));
             break;
         }
       }
@@ -262,58 +282,92 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 
 
-
-
   void _showBeachDialog(Map<String, dynamic> data) {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(data['name']),
-          content: SingleChildScrollView(
+        return Dialog(
+          child: Container(
+            width: MediaQuery
+                .of(context)
+                .size
+                .width * 0.95, // 90% of screen width
+            height: MediaQuery
+                .of(context)
+                .size
+                .height * 0.95, // 80% of screen height
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 200,
-                  child: CarouselSlider(
-                    options: CarouselOptions(
-                      aspectRatio: 16 / 9,
-                      viewportFraction: 0.8,
-                      enlargeCenterPage: true,
-                      autoPlay: true,
-                    ),
-                    items: (data['imageUrls'] as List).map((item) {
-                      return Container(
-                        child: Image.network(item, fit: BoxFit.cover),
-                      );
-                    }).toList(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    data['name'],
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ),
-                SizedBox(height: 20),
-                Text('Description: ${data['description']}'),
-                SizedBox(height: 10),
-                Text('Firewood: ${data['Firewood']}'),
-                SizedBox(height: 10),
-                Text('Sand: ${data['Sand']}'),
-                // Add other beach information here as needed
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: MediaQuery
+                              .of(context)
+                              .size
+                              .height * 0.4, // 40% of screen height
+                          child: CarouselSlider(
+                            options: CarouselOptions(
+                              aspectRatio: 16 / 9,
+                              viewportFraction: 0.9,
+                              // Make images fill up more of the carousel
+                              enlargeCenterPage: true,
+                              autoPlay: true,
+                            ),
+                            items: (data['imageUrls'] as List).map((item) {
+                              return Container(
+                                child: Image.network(item, fit: BoxFit.cover),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Description: ${data['description']}'),
+                              SizedBox(height: 10),
+                              Text('Firewood: ${data['Firewood']}'),
+                              SizedBox(height: 10),
+                              Text('Sand: ${data['Sand']}'),
+                              // Add other beach information here as needed
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      child: Text('Close'),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              child: Text('Close'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
         );
       },
     );
   }
 }
-
 Stream<List<DocumentSnapshot>> getNearbyBeaches(Position? currentPosition) {
   return FirebaseFirestore.instance.collection('locations').snapshots().map((snapshot) {
     var sortedDocs = snapshot.docs.toList()
