@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:dart_geohash/dart_geohash.dart';
+import 'beach_dialog.dart';
 
 
 
@@ -66,7 +67,8 @@ class _BeachListScreenState extends State<BeachListScreen> {
       });
     });
 
-    _bannerAd = createBannerAd()..load();
+    _bannerAd = createBannerAd()
+      ..load();
   }
 
   BannerAd createBannerAd() {
@@ -160,15 +162,20 @@ class _BeachListScreenState extends State<BeachListScreen> {
 
               return InkWell(
                 onTap: () {
-                  _showBeachDialog(data);
+                  _showBeachDetails(context, data);
                 },
                 child: Container(
-                  height: (MediaQuery.of(context).size.height - 100) / 3, // Adjusted height to account for the banner ad
+                  height: (MediaQuery
+                      .of(context)
+                      .size
+                      .height - 100) / 3,
+                  // Adjusted height to account for the banner ad
                   decoration: BoxDecoration(
                     image: DecorationImage(
                       fit: BoxFit.cover,
                       image: NetworkImage(
-                        data['imageUrls'] != null && data['imageUrls'].isNotEmpty
+                        data['imageUrls'] != null &&
+                            data['imageUrls'].isNotEmpty
                             ? data['imageUrls'][0]
                             : 'placeholder_image_url',
                       ),
@@ -198,18 +205,21 @@ class _BeachListScreenState extends State<BeachListScreen> {
                             color: Colors.white.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(8.0),
                           ),
-                          padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                          padding: EdgeInsets.symmetric(
+                              vertical: 5, horizontal: 10),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               IconButton(
-                                icon: Icon(Icons.info_outline, color: Colors.white),
+                                icon: Icon(
+                                    Icons.info_outline, color: Colors.white),
                                 onPressed: () {
-                                  _showBeachDialog(data);
+                                  _showBeachDetails(context, data);
                                 },
                               ),
                               IconButton(
-                                icon: Icon(Icons.directions, color: Colors.white),
+                                icon: Icon(
+                                    Icons.directions, color: Colors.white),
                                 onPressed: () {
                                   _launchMapsUrl(
                                     data['latitude'],
@@ -222,8 +232,10 @@ class _BeachListScreenState extends State<BeachListScreen> {
                                 onPressed: () async {
                                   List<Note> songNotes = generateSong(data);
                                   for (var note in songNotes) {
-                                    flutterMidi.playMidiNote(midi: note.midiValue);
-                                    await Future.delayed(note.duration); // Wait based on the duration of the note
+                                    flutterMidi.playMidiNote(
+                                        midi: note.midiValue);
+                                    await Future.delayed(note
+                                        .duration); // Wait based on the duration of the note
                                   }
                                 },
                               ),
@@ -241,7 +253,6 @@ class _BeachListScreenState extends State<BeachListScreen> {
       ),
     );
   }
-
 
 
   @override
@@ -308,94 +319,9 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 
 
-  void _showBeachDialog(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          child: Container(
-            width: MediaQuery
-                .of(context)
-                .size
-                .width * 1, // 90% of screen width
-            height: MediaQuery
-                .of(context)
-                .size
-                .height * 1, // 80% of screen height
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Text(
-                    data['name'],
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: MediaQuery
-                              .of(context)
-                              .size
-                              .height * 0.4, // 40% of screen height
-                          child: CarouselSlider(
-                            options: CarouselOptions(
-                              aspectRatio: 16 / 9,
-                              viewportFraction: 1.0,
-                              // Make images fill up more of the carousel
-                              enlargeCenterPage: true,
-                              autoPlay: true,
-                            ),
-                            items: (data['imageUrls'] as List).map((item) {
-                              return Container(
-                                child: Image.network(item, fit: BoxFit.cover),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Description: ${data['description']}'),
-                              SizedBox(height: 10),
-                              Text('Firewood: ${data['Firewood']}'),
-                              SizedBox(height: 10),
-                              Text('Sand: ${data['Sand']}'),
-                              // Add other beach information here as needed
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      child: Text('Close'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
-Stream<List<DocumentSnapshot<Object?>>> getNearbyBeachesStream(Position? currentPosition, {int precision = 5}) {
+  Stream<List<DocumentSnapshot<Object?>>> getNearbyBeachesStream(Position? currentPosition, {int precision = 5}) {
   return Stream.fromFuture(getNearbyBeaches(currentPosition, precision: precision));
 }
 
@@ -451,3 +377,12 @@ class Note {
   final Duration duration;
   Note(this.midiValue, this.duration);
 }
+
+void _showBeachDetails(BuildContext context, Map<String, dynamic> data) {
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (BuildContext context) {
+      return BeachDialogContent(data: data);
+    },
+  ));
+}
+
