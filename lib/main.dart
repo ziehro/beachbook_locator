@@ -17,7 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:dart_geohash/dart_geohash.dart';
 import 'beach_dialog.dart';
-
+import 'dart:js' as js;
 
 
 
@@ -54,6 +54,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
       List<DocumentSnapshot>> _streamController = StreamController<
       List<DocumentSnapshot>>();
 
+
   late final BannerAd _bannerAd;
 
   @override
@@ -61,14 +62,18 @@ class _BeachListScreenState extends State<BeachListScreen> {
     super.initState();
     loadMidi();
 
+
+
     _getLocation().then((_) {
       getNearbyBeachesStream(_currentPosition).listen((beaches) {
         _streamController.add(beaches);
       });
     });
 
-    _bannerAd = createBannerAd()
-      ..load();
+    if (!kIsWeb) {
+      _bannerAd = createBannerAd()
+        ..load();
+    }
   }
 
   BannerAd createBannerAd() {
@@ -91,9 +96,12 @@ class _BeachListScreenState extends State<BeachListScreen> {
 
 
   void loadMidi() async {
-    ByteData byteData = await rootBundle.load('assets/sounds/Piano.SF2');
-    await flutterMidi.prepare(sf2: byteData);
+    if (!kIsWeb) {
+      ByteData byteData = await rootBundle.load('assets/sounds/Piano.SF2');
+      await flutterMidi.prepare(sf2: byteData);
+    }
   }
+
 
   void _launchMapsUrl(double latitude, double longitude) async {
     String googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$latitude,$longitude";
@@ -115,19 +123,42 @@ class _BeachListScreenState extends State<BeachListScreen> {
     }
   }
 
+// Necessary for kIsWeb
 
   Future<void> _getLocation() async {
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.whileInUse &&
-            permission != LocationPermission.always) {
-          return; // Location permissions are denied
-        }
-      }
+      if (kIsWeb) {
+        // For the web, generate a random position around Calgary or Victoria
+        final isCalgary = Random().nextBool();
+        final latitude = isCalgary ? 51.0447 + Random().nextDouble() * 0.1 : 48.4284 + Random().nextDouble() * 0.1;
+        final longitude = isCalgary ? -114.0719 + Random().nextDouble() * 0.1 : -123.3656 + Random().nextDouble() * 0.1;
 
-      _currentPosition = await Geolocator.getCurrentPosition();
+        _currentPosition = Position(
+          latitude: latitude,
+          longitude: longitude,
+          altitude: 0.0,
+          accuracy: 0.0,
+          heading: 0.0,
+          speed: 0.0,
+          speedAccuracy: 0.0,
+          altitudeAccuracy: 0.0,
+          headingAccuracy: 0.0,
+          timestamp: DateTime.now(),
+        );
+      } else {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission != LocationPermission.whileInUse &&
+              permission != LocationPermission.always) {
+            return; // Location permissions are denied
+          }
+        }
+
+        _currentPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high
+        );
+      }
       setState(() {}); // Trigger a UI refresh now that we have location.
     } catch (e) {
       print("Error fetching location: $e");
@@ -138,7 +169,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: Container(
+      bottomNavigationBar: kIsWeb ? null : Container(
         height: 50.0, // Typically, banner ads are 50dp in height
         child: AdWidget(ad: _bannerAd),
       ),
@@ -230,12 +261,16 @@ class _BeachListScreenState extends State<BeachListScreen> {
                               ElevatedButton(
                                 child: Text('Play Song'),
                                 onPressed: () async {
-                                  List<Note> songNotes = generateSong(data);
-                                  for (var note in songNotes) {
-                                    flutterMidi.playMidiNote(
-                                        midi: note.midiValue);
-                                    await Future.delayed(note
-                                        .duration); // Wait based on the duration of the note
+                                  if (kIsWeb) {
+                                    // Use Tone.js for synthesizing sounds in the web build
+                                    playWebSynth();
+                                  } else {
+                                    // Your existing code to generate song and play using flutter_midi
+                                    List<Note> songNotes = generateSong(data);
+                                    for (var note in songNotes) {
+                                      flutterMidi.playMidiNote(midi: note.midiValue);
+                                      await Future.delayed(note.duration);
+                                    }
                                   }
                                 },
                               ),
@@ -258,7 +293,10 @@ class _BeachListScreenState extends State<BeachListScreen> {
   @override
   void dispose() {
     _streamController.close();
-    _bannerAd?.dispose();
+    if (!kIsWeb) {
+      _bannerAd?.dispose();
+    }
+
     super.dispose();
   }
 
@@ -386,3 +424,13 @@ void _showBeachDetails(BuildContext context, Map<String, dynamic> data) {
   ));
 }
 
+void playWebSynth() {
+  final synth = js.JsObject(js.context['Tone']['Synth']);
+  synth.callMethod('toDestination'); // Connects synth to default output
+
+  // Play a sequence of notes (for demonstration purposes)
+  List<String> notes = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4'];
+  for (var note in notes) {
+    synth.callMethod('triggerAttackRelease', [note, '8n']);
+  }
+}
