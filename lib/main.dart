@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 import 'dart:async';
+import 'AdMobService.dart';
 import 'firebase_options.dart';
 import 'package:flutter/foundation.dart';  // Add this import for kIsWeb
 import 'package:url_launcher/url_launcher.dart';
@@ -13,9 +14,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_midi/flutter_midi.dart';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
-
-
-
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:dart_geohash/dart_geohash.dart';
 
 
 
@@ -31,7 +31,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Beach Locator',
+      title: 'BeachBook',
+      debugShowCheckedModeBanner: false, // Add this line
+
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -51,15 +53,40 @@ class _BeachListScreenState extends State<BeachListScreen> {
       List<DocumentSnapshot>> _streamController = StreamController<
       List<DocumentSnapshot>>();
 
+  late final BannerAd _bannerAd;
 
   @override
   void initState() {
     super.initState();
     loadMidi();
+
     _getLocation().then((_) {
-      _streamController.addStream(getNearbyBeaches(_currentPosition));
+      getNearbyBeachesStream(_currentPosition).listen((beaches) {
+        _streamController.add(beaches);
+      });
     });
+
+    _bannerAd = createBannerAd()..load();
   }
+
+  BannerAd createBannerAd() {
+    return BannerAd(
+      adUnitId: AdMobService().getBannerAdUnitId(),
+      size: AdSize.banner,
+      listener: BannerAdListener(
+        onAdLoaded: (_) {
+          print("BannerAd event: Loaded");
+        },
+        onAdFailedToLoad: (ad, error) {
+          print("BannerAd failed to load: $error");
+          ad.dispose();
+        },
+        // ... Add other event handlers if needed
+      ),
+      request: AdRequest(),
+    );
+  }
+
 
   void loadMidi() async {
     ByteData byteData = await rootBundle.load('assets/sounds/Piano.SF2');
@@ -109,6 +136,10 @@ class _BeachListScreenState extends State<BeachListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      bottomNavigationBar: Container(
+        height: 50.0, // Typically, banner ads are 50dp in height
+        child: AdWidget(ad: _bannerAd),
+      ),
       body: StreamBuilder<List<DocumentSnapshot>>(
         stream: _streamController.stream,
         builder: (context, snapshot) {
@@ -132,16 +163,12 @@ class _BeachListScreenState extends State<BeachListScreen> {
                   _showBeachDialog(data);
                 },
                 child: Container(
-                  height: (MediaQuery
-                      .of(context)
-                      .size
-                      .height - 50) / 3,
+                  height: (MediaQuery.of(context).size.height - 100) / 3, // Adjusted height to account for the banner ad
                   decoration: BoxDecoration(
                     image: DecorationImage(
                       fit: BoxFit.cover,
                       image: NetworkImage(
-                        data['imageUrls'] != null &&
-                            data['imageUrls'].isNotEmpty
+                        data['imageUrls'] != null && data['imageUrls'].isNotEmpty
                             ? data['imageUrls'][0]
                             : 'placeholder_image_url',
                       ),
@@ -153,9 +180,11 @@ class _BeachListScreenState extends State<BeachListScreen> {
                       Center(
                         child: Text(
                           data['name'],
-                          style: TextStyle(fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -169,21 +198,18 @@ class _BeachListScreenState extends State<BeachListScreen> {
                             color: Colors.white.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(8.0),
                           ),
-                          padding: EdgeInsets.symmetric(
-                              vertical: 5, horizontal: 10),
+                          padding: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               IconButton(
-                                icon: Icon(
-                                    Icons.info_outline, color: Colors.white),
+                                icon: Icon(Icons.info_outline, color: Colors.white),
                                 onPressed: () {
                                   _showBeachDialog(data);
                                 },
                               ),
                               IconButton(
-                                icon: Icon(
-                                    Icons.directions, color: Colors.white),
+                                icon: Icon(Icons.directions, color: Colors.white),
                                 onPressed: () {
                                   _launchMapsUrl(
                                     data['latitude'],
@@ -196,10 +222,8 @@ class _BeachListScreenState extends State<BeachListScreen> {
                                 onPressed: () async {
                                   List<Note> songNotes = generateSong(data);
                                   for (var note in songNotes) {
-                                    flutterMidi.playMidiNote(
-                                        midi: note.midiValue);
-                                    await Future.delayed(note
-                                        .duration); // Wait based on the duration of the note
+                                    flutterMidi.playMidiNote(midi: note.midiValue);
+                                    await Future.delayed(note.duration); // Wait based on the duration of the note
                                   }
                                 },
                               ),
@@ -219,9 +243,11 @@ class _BeachListScreenState extends State<BeachListScreen> {
   }
 
 
+
   @override
   void dispose() {
     _streamController.close();
+    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -291,15 +317,15 @@ class _BeachListScreenState extends State<BeachListScreen> {
             width: MediaQuery
                 .of(context)
                 .size
-                .width * 0.95, // 90% of screen width
+                .width * 1, // 90% of screen width
             height: MediaQuery
                 .of(context)
                 .size
-                .height * 0.95, // 80% of screen height
+                .height * 1, // 80% of screen height
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(4.0),
                   child: Text(
                     data['name'],
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -318,7 +344,7 @@ class _BeachListScreenState extends State<BeachListScreen> {
                           child: CarouselSlider(
                             options: CarouselOptions(
                               aspectRatio: 16 / 9,
-                              viewportFraction: 0.9,
+                              viewportFraction: 1.0,
                               // Make images fill up more of the carousel
                               enlargeCenterPage: true,
                               autoPlay: true,
@@ -368,12 +394,32 @@ class _BeachListScreenState extends State<BeachListScreen> {
     );
   }
 }
-Stream<List<DocumentSnapshot>> getNearbyBeaches(Position? currentPosition) {
-  return FirebaseFirestore.instance.collection('locations').snapshots().map((snapshot) {
-    var sortedDocs = snapshot.docs.toList()
-      ..sort((a, b) => _compareDistance(a, b, currentPosition));
-    return sortedDocs.take(3).toList();
-  });
+
+Stream<List<DocumentSnapshot<Object?>>> getNearbyBeachesStream(Position? currentPosition, {int precision = 5}) {
+  return Stream.fromFuture(getNearbyBeaches(currentPosition, precision: precision));
+}
+
+
+
+Future<List<DocumentSnapshot>> getNearbyBeaches(Position? currentPosition, {int precision = 5}) async {
+  if (currentPosition == null) return [];
+  GeoHasher geoHasher = GeoHasher();
+  var geohash = geoHasher.encode(currentPosition.longitude, currentPosition.latitude, precision: precision);
+  var query = FirebaseFirestore.instance
+      .collection('locations')
+      .where('geohash', isGreaterThanOrEqualTo: geohash.substring(0, precision))
+      .where('geohash', isLessThan: geohash.substring(0, precision) + "z")
+      .limit(3); // Limit to 3 results
+
+  var snapshot = await query.get();
+  var beaches = snapshot.docs.toList();
+
+  // If fewer than 3 beaches are found, reduce precision and try again
+  if (beaches.length < 3 && precision > 1) {
+    return getNearbyBeaches(currentPosition, precision: precision - 1);
+  } else {
+    return beaches;
+  }
 }
 
 int _compareDistance(DocumentSnapshot a, DocumentSnapshot b, Position? currentPosition) {
